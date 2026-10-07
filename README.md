@@ -6,7 +6,6 @@ decrease image size and invert
 **Private by design**  
 All processing happens in your browser. Photos never leave your device and are never uploaded to a server.
 
-
 **True color inversion**  
 White becomes black, black becomes white. Full negative mode also flips color channels; lightness-only mode keeps the original hue while swapping bright and dark areas.
 
