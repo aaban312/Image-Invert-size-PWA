@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0c0e" />
+  <meta name="description" content="معکوس رنگ عکس و کم‌کردن حجم. پردازش روی دستگاه." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon-192.png" />
+  <title>معکوس رنگ عکس</title>
+  <style>
+    :root {
+      --bg: #0c0c0e;
+      --card: #17171b;
+      --line: #2a2a30;
+      --text: #f4f4f5;
+      --muted: #a1a1aa;
+      --accent: #ff5a28;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font-family: "Vazirmatn", "Segoe UI", Tahoma, sans-serif; }
+    body { min-height: 100dvh; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 8px; gap: 12px; }
+    h1 { font-size: 1.15rem; margin: 0; }
+    p.sub { margin: 4px 0 0; color: var(--muted); font-size: 0.85rem; }
+    main { padding: 8px 16px 32px; max-width: 760px; margin: 0 auto; }
+    .drop {
+      border: 1.5px dashed #3f3f46; background: #121216; border-radius: 18px;
+      padding: 22px 16px; text-align: center;
+    }
+    .drop.hot { border-color: var(--accent); background: #1c1210; }
+    .drop strong { display: block; margin-bottom: 6px; }
+    .drop span { color: var(--muted); font-size: 0.85rem; }
+    input[type="file"] { display: none; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    button {
+      border: 0; border-radius: 12px; padding: 11px 14px; font: inherit;
+      background: var(--card); color: var(--text); cursor: pointer; flex: 1;
+    }
+    button.primary { background: var(--accent); color: #fff; font-weight: 700; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .modes { display: flex; gap: 8px; margin: 14px 0; }
+    .modes label, .panel {
+      flex: 1; border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+      font-size: 0.85rem; background: var(--card);
+    }
+    .modes label { cursor: pointer; }
+    .modes input { accent-color: var(--accent); }
+    .panel { margin-top: 12px; }
+    .panel h2 { margin: 0 0 8px; font-size: 0.95rem; }
+    .stage {
+      margin-top: 14px; background: #09090b; border-radius: 18px; overflow: hidden;
+      border: 1px solid var(--line); min-height: 160px;
+    }
+    canvas { width: 100%; height: auto; display: block; background:
+      linear-gradient(45deg, #1a1a1e 25%, transparent 25%),
+      linear-gradient(-45deg, #1a1a1e 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1a1a1e 75%),
+      linear-gradient(-45deg, transparent 75%, #1a1a1e 75%);
+      background-size: 24px 24px; background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+    }
+    .hint { color: var(--muted); font-size: 0.8rem; margin-top: 10px; line-height: 1.7; }
+    .slider { width: 100%; margin-top: 6px; }
+    select { width: 100%; margin-top: 6px; background: #0c0c0e; color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px; font: inherit; }
+    .stats { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+    .stats b { color: var(--text); font-weight: 600; }
+    footer { color: #71717a; font-size: 0.75rem; text-align: center; padding-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>معکوس رنگ عکس</h1>
+      <p class="sub">گالری یا دوربین. حجم خروجی قابل تنظیم است.</p>
+    </div>
+    <button id="install" hidden style="flex:0">نصب اپ</button>
+  </header>
+  <main>
+    <div class="drop" id="drop">
+      <strong>عکس را اینجا رها کن</strong>
+      <span>یا یکی از دکمه‌های زیر را بزن</span>
+    </div>
+    <div class="row">
+      <button type="button" id="pickGallery" class="primary">انتخاب از گالری</button>
+      <button type="button" id="pickCamera">گرفتن با دوربین</button>
+    </div>
+    <input id="fileGallery" type="file" accept="image/*" />
+    <input id="fileCamera" type="file" accept="image/*" capture="environment" />
+
+    <div class="modes">
+      <label><input type="radio" name="mode" value="rgb" checked /> نگاتیو کامل<br><span style="color:#a1a1aa">سفید سیاه، رنگ‌ها هم برعکس</span></label>
+      <label><input type="radio" name="mode" value="light" /> فقط روشنایی<br><span style="color:#a1a1aa">روشن و تیره جابه‌جا، فام حفظ</span></label>
+    </div>
+    <label class="hint">شدت معکوس: <span id="amtLabel">۱۰۰٪</span></label>
+    <input class="slider" id="amount" type="range" min="0" max="100" value="100" />
+
+    <section class="panel">
+      <h2>کم‌کردن حجم</h2>
+      <label class="hint">بلندترین ضلع خروجی: <span id="edgeLabel">۱۶۰۰ پیکسل</span></label>
+      <input class="slider" id="edge" type="range" min="480" max="4000" step="40" value="1600" />
+      <label class="hint">کیفیت فشرده‌سازی: <span id="qLabel">۷۵٪</span></label>
+      <input class="slider" id="quality" type="range" min="30" max="95" step="1" value="75" />
+      <label class="hint">فرمت ذخیره</label>
+      <select id="format">
+        <option value="image/jpeg">JPEG — کم‌حجم، بدون شفافیت</option>
+        <option value="image/webp">WebP — کم‌حجم‌تر، اگر مرورگر پشتیبانی کند</option>
+        <option value="image/png">PNG — بدون افت کیفیت، معمولاً سنگین</option>
+      </select>
+      <div class="stats">
+        <span>اصل: <b id="origSize">—</b></span>
+        <span>خروجی تقریبی: <b id="outSize">—</b></span>
+        <span>ابعاد: <b id="dims">—</b></span>
+      </div>
+    </section>
+
+    <div class="stage"><canvas id="canvas"></canvas></div>
+    <div class="row">
+      <button id="download" class="primary" disabled>دانلود</button>
+      <button id="reset" disabled>برگشت به اصل</button>
+    </div>
+    <p class="hint">
+      دکمه گالری عمداً دوربین را باز نمی‌کند. دوربین دکمه جداست.
+      حجم با کوچک‌کردن ضلع و پایین آوردن کیفیت JPEG/WebP کم می‌شود. PNG فشرده نمی‌شود.
+    </p>
+  </main>
+  <footer>PWA محلی · Invert</footer>
+  <script>
+    const gallery = document.getElementById("fileGallery");
+    const camera = document.getElementById("fileCamera");
+    const drop = document.getElementById("drop");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const downloadBtn = document.getElementById("download");
+    const resetBtn = document.getElementById("reset");
+    const amount = document.getElementById("amount");
+    const amtLabel = document.getElementById("amtLabel");
+    const edge = document.getElementById("edge");
+    const edgeLabel = document.getElementById("edgeLabel");
+    const quality = document.getElementById("quality");
+    const qLabel = document.getElementById("qLabel");
+    const format = document.getElementById("format");
+    let source = null;
+    let originalBytes = 0;
+    let sizeTimer = null;
+
+    document.getElementById("pickGallery").onclick = () => gallery.click();
+    document.getElementById("pickCamera").onclick = () => camera.click();
+    gallery.addEventListener("change", () => { if (gallery.files[0]) loadFile(gallery.files[0]); });
+    camera.addEventListener("change", () => { if (camera.files[0]) loadFile(camera.files[0]); });
+    drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("hot"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("hot"));
+    drop.addEventListener("drop", (e) => {
+      e.preventDefault();
+      drop.classList.remove("hot");
+      if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+    document.querySelectorAll('input[name="mode"]').forEach((el) => el.addEventListener("change", render));
+    amount.addEventListener("input", () => { amtLabel.textContent = amount.value + "٪"; render(); });
+    edge.addEventListener("input", () => { edgeLabel.textContent = Number(edge.value).toLocaleString("fa-IR") + " پیکسل"; render(); });
+    quality.addEventListener("input", () => { qLabel.textContent = quality.value + "٪"; scheduleSize(); });
+    format.addEventListener("change", scheduleSize);
+
+    function loadFile(file) {
+      originalBytes = file.size;
+      document.getElementById("origSize").textContent = formatBytes(file.size);
+      const img = new Image();
+      img.onload = () => {
+        source = img;
+        downloadBtn.disabled = false;
+        resetBtn.disabled = false;
+        render();
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(file);
+    }
+
+    function targetSize() {
+      const maxEdge = Number(edge.value);
+      const scale = Math.min(1, maxEdge / Math.max(source.width, source.height));
+      return {
+        w: Math.max(1, Math.round(source.width * scale)),
+        h: Math.max(1, Math.round(source.height * scale))
+      };
+    }
+
+    function render() {
+      if (!source) return;
+      const { w, h } = targetSize();
+      canvas.width = w;
+      canvas.height = h;
+      ctx.drawImage(source, 0, 0, w, h);
+      const image = ctx.getImageData(0, 0, w, h);
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const t = Number(amount.value) / 100;
+      const d = image.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        let nr, ng, nb;
+        if (mode === "rgb") {
+          nr = 255 - r; ng = 255 - g; nb = 255 - b;
+        } else {
+          const inv = 255 - (Math.max(r, g, b) + Math.min(r, g, b));
+          nr = r + inv; ng = g + inv; nb = b + inv;
+        }
+        d[i] = r + (nr - r) * t;
+        d[i + 1] = g + (ng - g) * t;
+        d[i + 2] = b + (nb - b) * t;
+      }
+      ctx.putImageData(image, 0, 0);
+      document.getElementById("dims").textContent = w.toLocaleString("fa-IR") + " × " + h.toLocaleString("fa-IR");
+      scheduleSize();
+    }
+
+    function scheduleSize() {
+      clearTimeout(sizeTimer);
+      sizeTimer = setTimeout(estimateSize, 180);
+    }
+
+    function estimateSize() {
+      if (!source) return;
+      const type = format.value;
+      const q = type === "image/png" ? undefined : Number(quality.value) / 100;
+      canvas.toBlob((blob) => {
+        document.getElementById("outSize").textContent = blob ? formatBytes(blob.size) : "—";
+      }, type, q);
+    }
+
+    function formatBytes(n) {
+      if (n < 1024) return n + " B";
+      if (n < 1024 * 1024) return (n / 1024).toFixed(0) + " KB";
+      return (n / (1024 * 1024)).toFixed(2) + " MB";
+    }
+
+    resetBtn.addEventListener("click", () => {
+      amount.value = 0;
+      amtLabel.textContent = "۰٪";
+      render();
+    });
+
+    downloadBtn.addEventListener("click", () => {
+      const type = format.value;
+      const q = type === "image/png" ? undefined : Number(quality.value) / 100;
+      const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "inverted." + ext;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }, type, q);
+    });
+
+    let deferred;
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferred = e;
+      const btn = document.getElementById("install");
+      btn.hidden = false;
+      btn.onclick = async () => { deferred.prompt(); await deferred.userChoice; btn.hidden = true; };
+    });
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+  </script>
+</body>
+</html>
