@@ -4,18 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0c0c0e" />
-  <meta name="description" content="معکوس رنگ عکس و کم‌کردن حجم. پردازش روی دستگاه." />
+  <meta name="description" content="کراپ، معکوس رنگ و کم‌کردن حجم عکس. پردازش روی دستگاه." />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon-192.png" />
-  <title>معکوس رنگ عکس</title>
+  <title>معکوس و کراپ عکس</title>
   <style>
     :root {
-      --bg: #0c0c0e;
-      --card: #17171b;
-      --line: #2a2a30;
-      --text: #f4f4f5;
-      --muted: #a1a1aa;
-      --accent: #ff5a28;
+      --bg: #0c0c0e; --card: #17171b; --line: #2a2a30;
+      --text: #f4f4f5; --muted: #a1a1aa; --accent: #ff5a28;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; background: var(--bg); color: var(--text); font-family: "Vazirmatn", "Segoe UI", Tahoma, sans-serif; }
@@ -39,6 +35,7 @@
     }
     button.primary { background: var(--accent); color: #fff; font-weight: 700; }
     button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.active { outline: 2px solid var(--accent); }
     .modes { display: flex; gap: 8px; margin: 14px 0; }
     .modes label, .panel {
       flex: 1; border: 1px solid var(--line); border-radius: 12px; padding: 10px;
@@ -48,9 +45,11 @@
     .modes input { accent-color: var(--accent); }
     .panel { margin-top: 12px; }
     .panel h2 { margin: 0 0 8px; font-size: 0.95rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .chips button { flex: 0 0 auto; padding: 8px 12px; font-size: 0.8rem; }
     .stage {
       margin-top: 14px; background: #09090b; border-radius: 18px; overflow: hidden;
-      border: 1px solid var(--line); min-height: 160px;
+      border: 1px solid var(--line); min-height: 160px; position: relative; touch-action: none;
     }
     canvas { width: 100%; height: auto; display: block; background:
       linear-gradient(45deg, #1a1a1e 25%, transparent 25%),
@@ -62,7 +61,7 @@
     .hint { color: var(--muted); font-size: 0.8rem; margin-top: 10px; line-height: 1.7; }
     .slider { width: 100%; margin-top: 6px; }
     select { width: 100%; margin-top: 6px; background: #0c0c0e; color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px; font: inherit; }
-    .stats { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+    .stats { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
     .stats b { color: var(--text); font-weight: 600; }
     footer { color: #71717a; font-size: 0.75rem; text-align: center; padding-bottom: 20px; }
   </style>
@@ -70,8 +69,8 @@
 <body>
   <header>
     <div>
-      <h1>معکوس رنگ عکس</h1>
-      <p class="sub">گالری یا دوربین. حجم خروجی قابل تنظیم است.</p>
+      <h1>معکوس و کراپ عکس</h1>
+      <p class="sub">کراپ · معکوس رنگ · تنظیم حجم — روی دستگاه</p>
     </div>
     <button id="install" hidden style="flex:0">نصب اپ</button>
   </header>
@@ -86,6 +85,22 @@
     </div>
     <input id="fileGallery" type="file" accept="image/*" />
     <input id="fileCamera" type="file" accept="image/*" capture="environment" />
+
+    <section class="panel" id="cropPanel" hidden>
+      <h2>کراپ</h2>
+      <p class="hint" style="margin:0">وسط کادر را جابه‌جا کن. هر ضلع را جدا بکش (چپ، راست، بالا، پایین). گوشه‌ها هر دو جهت را عوض می‌کنند.</p>
+      <div class="chips" id="aspectChips">
+        <button type="button" data-aspect="free" class="active">آزاد</button>
+        <button type="button" data-aspect="1">۱:۱</button>
+        <button type="button" data-aspect="1.333">۴:۳</button>
+        <button type="button" data-aspect="1.777">۱۶:۹</button>
+        <button type="button" data-aspect="0.75">۳:۴</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button type="button" id="applyCrop" class="primary">اعمال کراپ</button>
+        <button type="button" id="resetCrop">بازنشانی کراپ</button>
+      </div>
+    </section>
 
     <div class="modes">
       <label><input type="radio" name="mode" value="rgb" checked /> نگاتیو کامل<br><span style="color:#a1a1aa">سفید سیاه، رنگ‌ها هم برعکس</span></label>
@@ -102,34 +117,34 @@
       <input class="slider" id="quality" type="range" min="30" max="95" step="1" value="75" />
       <label class="hint">فرمت ذخیره</label>
       <select id="format">
-        <option value="image/jpeg">JPEG — کم‌حجم، بدون شفافیت</option>
-        <option value="image/webp">WebP — کم‌حجم‌تر، اگر مرورگر پشتیبانی کند</option>
-        <option value="image/png">PNG — بدون افت کیفیت، معمولاً سنگین</option>
+        <option value="image/jpeg">JPEG — کم‌حجم</option>
+        <option value="image/webp">WebP — کم‌حجم‌تر</option>
+        <option value="image/png">PNG — بدون افت</option>
       </select>
       <div class="stats">
         <span>اصل: <b id="origSize">—</b></span>
-        <span>خروجی تقریبی: <b id="outSize">—</b></span>
+        <span>خروجی: <b id="outSize">—</b></span>
         <span>ابعاد: <b id="dims">—</b></span>
       </div>
     </section>
 
-    <div class="stage"><canvas id="canvas"></canvas></div>
+    <div class="stage" id="stage"><canvas id="canvas"></canvas></div>
     <div class="row">
       <button id="download" class="primary" disabled>دانلود</button>
       <button id="reset" disabled>برگشت به اصل</button>
     </div>
     <p class="hint">
-      دکمه گالری عمداً دوربین را باز نمی‌کند. دوربین دکمه جداست.
-      حجم با کوچک‌کردن ضلع و پایین آوردن کیفیت JPEG/WebP کم می‌شود. PNG فشرده نمی‌شود.
+      کراپ قبل از معکوس اعمال می‌شود. عکس از دستگاه خارج نمی‌شود.
     </p>
   </main>
-  <footer>PWA محلی · Invert</footer>
+  <footer>PWA محلی · Invert + Crop</footer>
   <script>
     const gallery = document.getElementById("fileGallery");
     const camera = document.getElementById("fileCamera");
     const drop = document.getElementById("drop");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const stage = document.getElementById("stage");
     const downloadBtn = document.getElementById("download");
     const resetBtn = document.getElementById("reset");
     const amount = document.getElementById("amount");
@@ -139,9 +154,17 @@
     const quality = document.getElementById("quality");
     const qLabel = document.getElementById("qLabel");
     const format = document.getElementById("format");
-    let source = null;
+    const cropPanel = document.getElementById("cropPanel");
+
+    let source = null;       // current working Image (after crops)
+    let originalImg = null;  // first loaded image
     let originalBytes = 0;
     let sizeTimer = null;
+
+    // crop box in image-pixel coordinates (relative to source)
+    let crop = null; // {x,y,w,h}
+    let aspect = "free"; // free | number
+    let drag = null; // {mode, startX, startY, ox, oy, ow, oh}
 
     document.getElementById("pickGallery").onclick = () => gallery.click();
     document.getElementById("pickCamera").onclick = () => camera.click();
@@ -156,16 +179,40 @@
     });
     document.querySelectorAll('input[name="mode"]').forEach((el) => el.addEventListener("change", render));
     amount.addEventListener("input", () => { amtLabel.textContent = amount.value + "٪"; render(); });
-    edge.addEventListener("input", () => { edgeLabel.textContent = Number(edge.value).toLocaleString("fa-IR") + " پیکسل"; render(); });
+    edge.addEventListener("input", () => {
+      edgeLabel.textContent = Number(edge.value).toLocaleString("fa-IR") + " پیکسل";
+      render();
+    });
     quality.addEventListener("input", () => { qLabel.textContent = quality.value + "٪"; scheduleSize(); });
     format.addEventListener("change", scheduleSize);
+
+    document.getElementById("aspectChips").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-aspect]");
+      if (!btn || !source) return;
+      document.querySelectorAll("#aspectChips button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      aspect = btn.dataset.aspect === "free" ? "free" : Number(btn.dataset.aspect);
+      fitCropToAspect();
+      render();
+    });
+
+    document.getElementById("applyCrop").addEventListener("click", applyCrop);
+    document.getElementById("resetCrop").addEventListener("click", () => {
+      if (!originalImg) return;
+      source = originalImg;
+      initFullCrop();
+      render();
+    });
 
     function loadFile(file) {
       originalBytes = file.size;
       document.getElementById("origSize").textContent = formatBytes(file.size);
       const img = new Image();
       img.onload = () => {
+        originalImg = img;
         source = img;
+        initFullCrop();
+        cropPanel.hidden = false;
         downloadBtn.disabled = false;
         resetBtn.disabled = false;
         render();
@@ -174,21 +221,50 @@
       img.src = URL.createObjectURL(file);
     }
 
+    function initFullCrop() {
+      if (!source) return;
+      crop = { x: 0, y: 0, w: source.width, h: source.height };
+      aspect = "free";
+      document.querySelectorAll("#aspectChips button").forEach((b) => {
+        b.classList.toggle("active", b.dataset.aspect === "free");
+      });
+    }
+
+    function fitCropToAspect() {
+      if (!source || aspect === "free") return;
+      const ar = aspect;
+      let w = crop.w, h = crop.h;
+      if (w / h > ar) w = h * ar;
+      else h = w / ar;
+      w = Math.min(w, source.width);
+      h = Math.min(h, source.height);
+      if (w / h > ar) w = h * ar; else h = w / ar;
+      crop.w = Math.max(20, Math.round(w));
+      crop.h = Math.max(20, Math.round(h));
+      crop.x = Math.min(crop.x, source.width - crop.w);
+      crop.y = Math.min(crop.y, source.height - crop.h);
+      crop.x = Math.max(0, crop.x);
+      crop.y = Math.max(0, crop.y);
+    }
+
     function targetSize() {
       const maxEdge = Number(edge.value);
-      const scale = Math.min(1, maxEdge / Math.max(source.width, source.height));
+      const cw = crop ? crop.w : source.width;
+      const ch = crop ? crop.h : source.height;
+      const scale = Math.min(1, maxEdge / Math.max(cw, ch));
       return {
-        w: Math.max(1, Math.round(source.width * scale)),
-        h: Math.max(1, Math.round(source.height * scale))
+        w: Math.max(1, Math.round(cw * scale)),
+        h: Math.max(1, Math.round(ch * scale))
       };
     }
 
     function render() {
-      if (!source) return;
+      if (!source || !crop) return;
       const { w, h } = targetSize();
       canvas.width = w;
       canvas.height = h;
-      ctx.drawImage(source, 0, 0, w, h);
+      // draw cropped region scaled to canvas
+      ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
       const image = ctx.getImageData(0, 0, w, h);
       const mode = document.querySelector('input[name="mode"]:checked').value;
       const t = Number(amount.value) / 100;
@@ -207,8 +283,222 @@
         d[i + 2] = b + (nb - b) * t;
       }
       ctx.putImageData(image, 0, 0);
-      document.getElementById("dims").textContent = w.toLocaleString("fa-IR") + " × " + h.toLocaleString("fa-IR");
+      drawCropOverlay();
+      document.getElementById("dims").textContent =
+        w.toLocaleString("fa-IR") + " × " + h.toLocaleString("fa-IR");
       scheduleSize();
+    }
+
+    function drawCropOverlay() {
+      // overlay shows relative crop on the *preview* which is already cropped.
+      // For interactive crop we need a dual approach: show full image when adjusting.
+      // Simpler UX: always show working preview (cropped+inverted).
+      // Interactive crop uses a separate full-image pass when dragging.
+    }
+
+    // Interactive crop: when user touches canvas, we re-render FULL source with dimmed outside
+    function renderCropUI() {
+      if (!source || !crop) return;
+      const maxEdge = 1200;
+      const scale = Math.min(1, maxEdge / Math.max(source.width, source.height));
+      const dw = Math.round(source.width * scale);
+      const dh = Math.round(source.height * scale);
+      canvas.width = dw;
+      canvas.height = dh;
+      ctx.drawImage(source, 0, 0, dw, dh);
+      // dim outside crop
+      const sx = crop.x * scale, sy = crop.y * scale, sw = crop.w * scale, sh = crop.h * scale;
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(0, 0, dw, dh);
+      ctx.clearRect(sx, sy, sw, sh);
+      ctx.drawImage(source, crop.x, crop.y, crop.w, crop.h, sx, sy, sw, sh);
+      // border
+      ctx.strokeStyle = "#ff5a28";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(sx, sy, sw, sh);
+      // corner + edge handles
+      const hs = 16;
+      ctx.fillStyle = "#ff5a28";
+      const handles = [
+        [sx, sy], [sx + sw, sy], [sx, sy + sh], [sx + sw, sy + sh],
+        [sx + sw / 2, sy], [sx + sw / 2, sy + sh],
+        [sx, sy + sh / 2], [sx + sw, sy + sh / 2]
+      ];
+      handles.forEach(([hx, hy]) => {
+        ctx.fillRect(hx - hs / 2, hy - hs / 2, hs, hs);
+      });
+    }
+
+    let cropMode = false;
+
+    function enterCropEdit() {
+      cropMode = true;
+      renderCropUI();
+    }
+
+    function exitCropEdit() {
+      cropMode = false;
+      render();
+    }
+
+    // Pointer events for crop
+    function canvasToImage(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = source.width / rect.width;
+      const scaleY = source.height / rect.height;
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    }
+
+    function hitTest(ix, iy) {
+      if (!crop) return null;
+      const hs = Math.max(28, Math.min(crop.w, crop.h) * 0.1);
+      const points = [
+        { mode: "nw", x: crop.x, y: crop.y },
+        { mode: "ne", x: crop.x + crop.w, y: crop.y },
+        { mode: "sw", x: crop.x, y: crop.y + crop.h },
+        { mode: "se", x: crop.x + crop.w, y: crop.y + crop.h },
+        { mode: "n", x: crop.x + crop.w / 2, y: crop.y },
+        { mode: "s", x: crop.x + crop.w / 2, y: crop.y + crop.h },
+        { mode: "w", x: crop.x, y: crop.y + crop.h / 2 },
+        { mode: "e", x: crop.x + crop.w, y: crop.y + crop.h / 2 }
+      ];
+      for (const c of points) {
+        if (Math.abs(ix - c.x) <= hs && Math.abs(iy - c.y) <= hs) return c.mode;
+      }
+      // also hit near edges (not only center handle) for easier touch
+      const edgePad = hs;
+      if (ix >= crop.x - edgePad && ix <= crop.x + crop.w + edgePad) {
+        if (Math.abs(iy - crop.y) <= edgePad) return "n";
+        if (Math.abs(iy - (crop.y + crop.h)) <= edgePad) return "s";
+      }
+      if (iy >= crop.y - edgePad && iy <= crop.y + crop.h + edgePad) {
+        if (Math.abs(ix - crop.x) <= edgePad) return "w";
+        if (Math.abs(ix - (crop.x + crop.w)) <= edgePad) return "e";
+      }
+      if (ix >= crop.x && ix <= crop.x + crop.w && iy >= crop.y && iy <= crop.y + crop.h) return "move";
+      return null;
+    }
+
+    stage.addEventListener("pointerdown", (e) => {
+      if (!source || !crop) return;
+      if (!cropMode) enterCropEdit();
+      const p = canvasToImage(e.clientX, e.clientY);
+      const mode = hitTest(p.x, p.y) || "move";
+      drag = {
+        mode,
+        startX: p.x,
+        startY: p.y,
+        ox: crop.x,
+        oy: crop.y,
+        ow: crop.w,
+        oh: crop.h
+      };
+      stage.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    stage.addEventListener("pointermove", (e) => {
+      if (!drag || !source) return;
+      const p = canvasToImage(e.clientX, e.clientY);
+      const dx = p.x - drag.startX;
+      const dy = p.y - drag.startY;
+      let { ox, oy, ow, oh } = drag;
+      let x = ox, y = oy, w = ow, h = oh;
+      const minSize = 20;
+      const m = drag.mode;
+
+      if (m === "move") {
+        x = Math.max(0, Math.min(ox + dx, source.width - ow));
+        y = Math.max(0, Math.min(oy + dy, source.height - oh));
+        w = ow;
+        h = oh;
+      } else {
+        // independent edges: only the dragged side moves
+        if (m === "e" || m === "ne" || m === "se") {
+          w = Math.max(minSize, Math.min(ow + dx, source.width - ox));
+        }
+        if (m === "s" || m === "sw" || m === "se") {
+          h = Math.max(minSize, Math.min(oh + dy, source.height - oy));
+        }
+        if (m === "w" || m === "nw" || m === "sw") {
+          const right = ox + ow;
+          x = Math.max(0, Math.min(ox + dx, right - minSize));
+          w = right - x;
+        }
+        if (m === "n" || m === "nw" || m === "ne") {
+          const bottom = oy + oh;
+          y = Math.max(0, Math.min(oy + dy, bottom - minSize));
+          h = bottom - y;
+        }
+
+        // aspect lock only when ratio is fixed (not free)
+        if (aspect !== "free") {
+          const ar = aspect;
+          if (m === "e" || m === "w") {
+            h = w / ar;
+            if (y + h > source.height) {
+              h = source.height - y;
+              w = h * ar;
+              if (m === "w") x = ox + ow - w;
+            }
+            if (h < minSize) { h = minSize; w = h * ar; }
+          } else if (m === "n" || m === "s") {
+            w = h * ar;
+            if (x + w > source.width) {
+              w = source.width - x;
+              h = w / ar;
+              if (m === "n") y = oy + oh - h;
+            }
+            if (w < minSize) { w = minSize; h = w / ar; }
+          } else {
+            // corners: drive from the dominant delta
+            if (Math.abs(dx) >= Math.abs(dy)) {
+              h = w / ar;
+              if (m.includes("n")) y = oy + oh - h;
+            } else {
+              w = h * ar;
+              if (m.includes("w")) x = ox + ow - w;
+            }
+            if (x < 0) { w += x; x = 0; h = w / ar; if (m.includes("n")) y = oy + oh - h; }
+            if (y < 0) { h += y; y = 0; w = h * ar; if (m.includes("w")) x = ox + ow - w; }
+            if (x + w > source.width) { w = source.width - x; h = w / ar; if (m.includes("n")) y = oy + oh - h; }
+            if (y + h > source.height) { h = source.height - y; w = h * ar; if (m.includes("w")) x = ox + ow - w; }
+          }
+        }
+
+        x = Math.max(0, x);
+        y = Math.max(0, y);
+        w = Math.max(minSize, Math.min(w, source.width - x));
+        h = Math.max(minSize, Math.min(h, source.height - y));
+      }
+      crop = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+      renderCropUI();
+    });
+
+    stage.addEventListener("pointerup", () => {
+      drag = null;
+      // stay in crop UI until Apply or user changes invert — keep crop mode until apply
+    });
+    stage.addEventListener("pointercancel", () => { drag = null; });
+
+    function applyCrop() {
+      if (!source || !crop) return;
+      const off = document.createElement("canvas");
+      off.width = Math.max(1, Math.round(crop.w));
+      off.height = Math.max(1, Math.round(crop.h));
+      const octx = off.getContext("2d");
+      octx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, off.width, off.height);
+      const img = new Image();
+      img.onload = () => {
+        source = img;
+        initFullCrop();
+        cropMode = false;
+        render();
+      };
+      img.src = off.toDataURL("image/png");
     }
 
     function scheduleSize() {
@@ -217,10 +507,33 @@
     }
 
     function estimateSize() {
-      if (!source) return;
+      if (!source || !crop) return;
       const type = format.value;
       const q = type === "image/png" ? undefined : Number(quality.value) / 100;
-      canvas.toBlob((blob) => {
+      const { w, h } = targetSize();
+      const off = document.createElement("canvas");
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext("2d");
+      octx.drawImage(source, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
+      const image = octx.getImageData(0, 0, w, h);
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const t = Number(amount.value) / 100;
+      const d = image.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        let nr, ng, nb;
+        if (mode === "rgb") { nr = 255 - r; ng = 255 - g; nb = 255 - b; }
+        else {
+          const inv = 255 - (Math.max(r, g, b) + Math.min(r, g, b));
+          nr = r + inv; ng = g + inv; nb = b + inv;
+        }
+        d[i] = r + (nr - r) * t;
+        d[i + 1] = g + (ng - g) * t;
+        d[i + 2] = b + (nb - b) * t;
+      }
+      octx.putImageData(image, 0, 0);
+      off.toBlob((blob) => {
         document.getElementById("outSize").textContent = blob ? formatBytes(blob.size) : "—";
       }, type, q);
     }
@@ -232,12 +545,20 @@
     }
 
     resetBtn.addEventListener("click", () => {
+      if (!originalImg) return;
+      source = originalImg;
       amount.value = 0;
       amtLabel.textContent = "۰٪";
+      initFullCrop();
+      cropMode = false;
       render();
     });
 
     downloadBtn.addEventListener("click", () => {
+      if (cropMode) {
+        cropMode = false;
+        render();
+      }
       const type = format.value;
       const q = type === "image/png" ? undefined : Number(quality.value) / 100;
       const ext = type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg";
@@ -245,11 +566,15 @@
         if (!blob) return;
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = "inverted." + ext;
+        a.download = "edited." + ext;
         a.click();
         URL.revokeObjectURL(a.href);
       }, type, q);
     });
+
+    // when invert/size changes while in crop UI, exit to final preview
+    amount.addEventListener("change", () => { if (cropMode) { cropMode = false; render(); } });
+    edge.addEventListener("change", () => { if (cropMode) { cropMode = false; render(); } });
 
     let deferred;
     window.addEventListener("beforeinstallprompt", (e) => {
